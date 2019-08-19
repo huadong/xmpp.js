@@ -1,7 +1,5 @@
 'use strict'
 
-const WS = require('ws')
-const WebSocket = global.WebSocket || WS
 const EventEmitter = require('events')
 
 const CODE = 'ECONNERROR'
@@ -14,7 +12,13 @@ class Socket extends EventEmitter {
 
   connect(url) {
     this.url = url
-    this._attachSocket(new WebSocket(url, ['xmpp']))
+    this._attachSocket(wx.connectSocket({
+      url,
+      header: {
+        'content-type': 'application/json'
+      },
+      protocols: ['xmpp']
+    }))
   }
 
   _attachSocket(socket) {
@@ -24,7 +28,10 @@ class Socket extends EventEmitter {
       this.emit('connect')
     }
 
-    listeners.message = ({data}) => this.emit('data', data)
+    listeners.message = ({data}) => {
+      this.emit('data', data)
+    }
+
     listeners.error = event => {
       // WS
       let {error} = event
@@ -45,17 +52,16 @@ class Socket extends EventEmitter {
       this.emit('close', !event.wasClean, event)
     }
 
-    sock.addEventListener('open', listeners.open)
-    sock.addEventListener('message', listeners.message)
-    sock.addEventListener('error', listeners.error)
-    sock.addEventListener('close', listeners.close)
+    sock.onOpen(listeners.open)
+    sock.onMessage(listeners.message)
+    sock.onError(listeners.error)
+    sock.onClose(listeners.close)
   }
 
   _detachSocket() {
     delete this.url
     const {socket, listeners} = this
     Object.getOwnPropertyNames(listeners).forEach(k => {
-      socket.removeEventListener(k, listeners[k])
       delete listeners[k]
     })
     delete this.socket
@@ -66,12 +72,11 @@ class Socket extends EventEmitter {
   }
 
   write(data, fn) {
-    if (WebSocket === WS) {
-      this.socket.send(data, fn)
-    } else {
-      this.socket.send(data)
-      fn()
-    }
+    this.socket.send({
+      data,
+      success: () => fn(),
+      fail: fn
+    });
   }
 }
 
