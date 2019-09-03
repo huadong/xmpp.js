@@ -238,9 +238,10 @@ class Connection extends EventEmitter {
 
     this._attachParser(new this.Parser())
 
+    const ps = promise(this.parser, 'start', 'error', timeout)
     await this.write(this.header(headerElement))
 
-    const el = await promise(this.parser, 'start', 'error', timeout)
+    const el = await ps
     this._status('open', el)
   }
 
